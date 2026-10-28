@@ -1,0 +1,60 @@
+import { openDatabase } from "@/server/db/db";
+import { CourtRepo } from "@/server/db/repo";
+import { CourtService } from "@/server/court/service";
+import { DemoProvider } from "@/server/ai/demo";
+import { AIError } from "@/server/ai/errors";
+import type { AIProvider, AIRequest } from "@/server/ai/types";
+import type { ServerConfig } from "@/server/config";
+import type { SearchProvider } from "@/server/evidence/search";
+import { AGENT_IDS } from "@/shared/agents";
+
+export const IDEA = {
+  title: "Планировщик питания с ИИ",
+  description:
+    "Веб-приложение, которое по списку продуктов в холодильнике составляет меню на неделю и список покупок. Для занятых родителей, которые тратят много времени на планирование.",
+  optionalContext: { audience: "Работающие родители с детьми", monetization: "Подписка 299 ₽ в месяц" },
+};
+
+/** Провайдер-обёртка: считает вызовы и позволяет «ронять» выбранные задачи. */
+export class SpyProvider implements AIProvider {
+  readonly id = "demo" as const;
+  readonly label = "spy";
+  readonly paid = false;
+  readonly model = null;
+  calls: string[] = [];
+  failures = new Map<string, AIError[]>();
+  private inner = new DemoProvider({ latencyMs: 0 });
+
+  failNext(key: string, ...errors: AIError[]) {
+    this.failures.set(key, errors);
+  }
+
+  async generate<T>(req: AIRequest<T>): Promise<T> {
+    const key = req.input.task === "agent" ? `agent:${req.input.agentId}` : req.input.task;
+    this.calls.push(key);
+    const queue = this.failures.get(key);
+    if (queue && queue.length) throw queue.shift()!;
+    return this.inner.generate(req);
+  }
+}
+
+export function makeService(opts: { provider?: AIProvider; search?: SearchProvider | null; retries?: number; staleMs?: number } = {}) {
+  const db = openDatabase(":memory:");
+  const repo = new CourtRepo(db, opts.staleMs ?? 60_000);
+  const provider = opts.provider ?? new SpyProvider();
+  const cfg: ServerConfig = {
+    provider,
+    search: opts.search ?? null,
+    retries: opts.retries ?? 0,
+    timeoutMs: 5_000,
+    configError: null,
+  };
+  return { db, repo, service: new CourtService(repo, cfg), provider };
+}
+
+export async function runFullCourt(service: CourtService, caseId: string) {
+  await service.collectEvidence(caseId);
+  await Promise.all(AGENT_IDS.map((id) => service.runAgent(caseId, id)));
+  await service.runCrossExam(caseId);
+  return service.runVerdict(caseId, { allowPartial: true });
+}
