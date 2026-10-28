@@ -180,7 +180,7 @@ export interface CaseSummary {
 }
 
 export interface AppSettings {
-  provider: "claude-code" | "anthropic-api";
+  provider: "claude-code" | "anthropic-api" | "claude-artifact";
   providerLabel: string;
   /** subscription — расходует лимиты подписки Claude; api — оплата по токенам; null — провайдер не готов. */
   billing: "subscription" | "api" | null;
@@ -191,6 +191,8 @@ export interface AppSettings {
   configError: string | null;
   search: { provider: "none" | "tavily"; configured: boolean };
   databasePath: string;
+  /** Сколько запросов к модели разрешено одновременно (ограничение среды). */
+  maxConcurrency?: number;
 }
 
 export type { Claim };

@@ -8,7 +8,7 @@ import { TavilySearch, type SearchProvider } from "./evidence/search";
 
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
-export type ProviderKind = "claude-code" | "anthropic-api";
+export type ProviderKind = "claude-code" | "anthropic-api" | "claude-artifact";
 
 export interface ServerConfig {
   kind: ProviderKind;
@@ -19,8 +19,6 @@ export interface ServerConfig {
   timeoutMs: number;
   configError: string | null;
 }
-
-export const NOT_CONFIGURED_MESSAGE = "AI-провайдер не готов. Откройте настройки ⚙ — там описано, что сделать.";
 
 export interface ConfigDeps {
   checkAuth?: (bin: string) => ClaudeAuthStatus;

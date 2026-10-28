@@ -1,15 +1,8 @@
 import type { AgentAnalysis, AgentId, AppSettings, CaseBundle, CaseStatus, CaseSummary } from "@/shared/types";
 import type { NewIdeaInput } from "@/shared/schemas";
+import { ApiError } from "./apiError";
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly details?: unknown,
-  ) {
-    super(message);
-  }
-}
+export { ApiError };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let res: Response;

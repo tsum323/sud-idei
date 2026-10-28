@@ -15,12 +15,14 @@ import type { AgentAnalysis, AgentId, CaseBundle, Evidence, IdeaCase } from "@/s
 import { AIError, describeError } from "../ai/errors";
 import { withRetry } from "../ai/retry";
 import { systemPromptFor } from "../agents/roles";
-import type { CourtRepo } from "../db/repo";
+import type { CourtStore } from "../db/store";
 import { buildQueries } from "../evidence/search";
 import { runJudge } from "../judge/judge";
-import { NOT_CONFIGURED_MESSAGE, type ServerConfig } from "../config";
+import type { ServerConfig } from "../config";
 import type { AIProvider } from "../ai/types";
 import { agentPrompt, CROSS_EXAM_SYSTEM, crossExamPrompt } from "./prompts";
+
+export const NOT_CONFIGURED_MESSAGE = "AI-провайдер не готов. Откройте настройки ⚙ — там описано, что сделать.";
 
 export class CourtError extends Error {
   constructor(
@@ -54,8 +56,8 @@ export interface RunOptions {
  */
 export class CourtService {
   constructor(
-    private repo: CourtRepo,
-    private cfg: ServerConfig,
+    private repo: CourtStore,
+    private cfg: Pick<ServerConfig, "provider" | "search" | "retries" | "timeoutMs">,
   ) {
     repo.upsertAgents(
       AGENTS.map((a) => ({ id: a.id, name: a.name, role: a.role, systemPrompt: systemPromptFor(a.id), visualStyle: a.visualStyle })),
@@ -85,7 +87,7 @@ export class CourtService {
     return this.repo.getBundle(caseId);
   }
 
-  list(filter: Parameters<CourtRepo["listCases"]>[0]) {
+  list(filter: Parameters<CourtStore["listCases"]>[0]) {
     return this.repo.listCases(filter);
   }
 

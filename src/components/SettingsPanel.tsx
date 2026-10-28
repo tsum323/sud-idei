@@ -5,6 +5,16 @@ import type { AppSettings } from "@/shared/types";
 import { Modal } from "./Modal";
 
 function SetupSteps({ settings }: { settings: AppSettings }) {
+  if (settings.provider === "claude-artifact") {
+    return (
+      <ol className="setup-steps">
+        <li>Откройте эту страницу на claude.ai — в приложении Claude или в браузере, войдя в свой аккаунт.</li>
+        <li>
+          Если вы отказали странице в доступе к Claude, разрешите его в меню разрешений страницы и обновите её.
+        </li>
+      </ol>
+    );
+  }
   if (settings.provider === "anthropic-api") {
     return (
       <ol className="setup-steps">
@@ -66,10 +76,11 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
             {settings.billing && <span className="tag tag-paid">{BILLING_TAG[settings.billing]}</span>}
           </dd>
           {settings.effort && (<><dt>Effort</dt><dd>{settings.effort}</dd></>)}
+          {settings.provider === "claude-artifact" && settings.configured && (<><dt>Режим</dt><dd>{prefs.economy ? "экономный" : "обычный"}</dd></>)}
           <dt>Веб-поиск</dt>
           <dd>{settings.search.configured ? `Подключён (${settings.search.provider})` : "Не настроен — актуальные данные не проверяются"}</dd>
           <dt>Хранилище</dt>
-          <dd><code>{settings.databasePath}</code> (SQLite)</dd>
+          <dd>{settings.provider === "claude-artifact" ? settings.databasePath : <><code>{settings.databasePath}</code> (SQLite)</>}</dd>
         </dl>
       ) : (
         <p className="muted">Загрузка…</p>
@@ -83,16 +94,24 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
       )}
       {settings?.billing === "subscription" && (
         <p className="muted small">
-          Запросы идут через установленный у вас Claude Code и расходуют лимиты подписки, отдельной оплаты нет. Одно
-          заседание — около 11 запросов. Если лимит исчерпан, агенты покажут ошибку, а заседание можно продолжить после сброса.
+          {settings.provider === "claude-artifact"
+            ? "Запросы идут к Claude от вашего имени и расходуют лимиты вашей подписки, отдельной оплаты нет. При первом запросе claude.ai попросит разрешение."
+            : "Запросы идут через установленный у вас Claude Code и расходуют лимиты подписки, отдельной оплаты нет."}{" "}
+          Одно заседание — около 11 запросов. Если лимит исчерпан, агенты покажут ошибку, а заседание можно продолжить после сброса.
         </p>
       )}
 
       <h3>Параметры запуска</h3>
       <label className="field field-inline">
-        <span className="field-label">Параллельных запросов агентов: {prefs.concurrency}</span>
-        <input type="range" min={1} max={9} value={prefs.concurrency} onChange={(e) => onChange({ ...prefs, concurrency: Number(e.target.value) })} />
+        <span className="field-label">Параллельных запросов агентов: {Math.min(prefs.concurrency, settings?.maxConcurrency ?? 9)}</span>
+        <input type="range" min={1} max={settings?.maxConcurrency ?? 9} value={Math.min(prefs.concurrency, settings?.maxConcurrency ?? 9)} onChange={(e) => onChange({ ...prefs, concurrency: Number(e.target.value) })} />
       </label>
+      {settings?.provider === "claude-artifact" && (
+        <label className="check">
+          <input type="checkbox" checked={prefs.economy} onChange={(e) => onChange({ ...prefs, economy: e.target.checked })} />
+          Экономный режим: агенты отвечают на быстрой модели, лимиты расходуются заметно меньше
+        </label>
+      )}
       <label className="check">
         <input type="checkbox" checked={prefs.confirmPaid} onChange={(e) => onChange({ ...prefs, confirmPaid: e.target.checked })} />
         Спрашивать подтверждение перед запуском запросов к модели

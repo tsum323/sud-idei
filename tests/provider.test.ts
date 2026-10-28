@@ -130,9 +130,13 @@ describe("конфигурация и секреты", () => {
       expect(src, f).not.toMatch(/from ["']@\/server/);
       expect(src, f).not.toMatch(/process\.env/);
     }
-    // серверные модули защищены пакетом server-only от попадания в клиентскую сборку
-    for (const f of files.filter((f) => f.includes(`${path.sep}server${path.sep}`) && !f.endsWith("errors.ts") && !f.endsWith("retry.ts") && !f.endsWith("types.ts"))) {
-      expect(fs.readFileSync(f, "utf8"), f).toMatch(/import "server-only"/);
+    // Модули, которые читают переменные окружения или используют Node, защищены от попадания в браузер.
+    const sensitive = files.filter((f) => /process\.env|from "node:|@anthropic-ai\/sdk/.test(fs.readFileSync(f, "utf8")) && f.includes(`${path.sep}server${path.sep}`));
+    expect(sensitive.length).toBeGreaterThan(4);
+    for (const f of sensitive) expect(fs.readFileSync(f, "utf8"), f).toMatch(/import "server-only"/);
+    // Версия для claude.ai не должна тянуть такие модули.
+    for (const f of files.filter((f) => f.includes(`${path.sep}artifact${path.sep}`))) {
+      expect(fs.readFileSync(f, "utf8"), f).not.toMatch(/process\.env|from "node:|@\/server\/(config|instance|http|db\/db|db\/repo|ai\/anthropic|ai\/claudeCode)"/);
     }
   });
 });

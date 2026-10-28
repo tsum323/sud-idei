@@ -3,8 +3,9 @@ import { execFileSync, spawn, type SpawnOptions } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { z } from "zod";
+import type { z } from "zod";
 import { AIError } from "./errors";
+import { toPlainJsonSchema } from "./jsonSchema";
 import type { AIProvider, AIRequest } from "./types";
 
 export interface ClaudeCodeOptions {
@@ -45,12 +46,6 @@ function workDir(): string {
   return dir;
 }
 
-/** JSON Schema для --json-schema: без метки $schema, которую Claude Code не распознаёт. */
-export function cliJsonSchema(schema: z.ZodType): Record<string, unknown> {
-  const { $schema: _ignored, ...rest } = z.toJSONSchema(schema, { target: "draft-7" }) as Record<string, unknown>;
-  return rest;
-}
-
 /** Классифицирует текст ошибки Claude Code: от типа зависит, повторять ли вызов. */
 export function classifyCliError(text: string, status?: number | null): AIError {
   const t = text.slice(0, 300);
@@ -89,7 +84,7 @@ export class ClaudeCodeProvider implements AIProvider {
     return [
       "-p",
       "--output-format", "json",
-      "--json-schema", JSON.stringify(cliJsonSchema(schema)),
+      "--json-schema", JSON.stringify(toPlainJsonSchema(schema)),
       "--system-prompt", system,
       "--tools", "",
       "--strict-mcp-config",

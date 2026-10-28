@@ -6,33 +6,13 @@ import { estimateCalls, planCourt } from "@/shared/courtPlan";
 import type { NewIdeaInput } from "@/shared/schemas";
 import type { AgentId, AppSettings, CaseBundle } from "@/shared/types";
 import { api, ApiError } from "./api";
+import { DEFAULT_PREFS, loadPrefs, savePrefs, safeStorage, type Prefs } from "./prefs";
 
-export type ConfirmFn = (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
-
-export interface Prefs {
-  concurrency: number;
-  confirmPaid: boolean;
-}
+export type { Prefs };
 
 const LAST_CASE_KEY = "ai-court:last-case";
-const PREFS_KEY = "ai-court:prefs";
-export const DEFAULT_PREFS: Prefs = { concurrency: 3, confirmPaid: true };
 
-function safeStorage<T>(fn: () => T, fallback: T): T {
-  try {
-    return fn();
-  } catch {
-    return fallback;
-  }
-}
-
-export function loadPrefs(): Prefs {
-  return safeStorage(() => ({ ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") }), DEFAULT_PREFS);
-}
-
-export function savePrefs(p: Prefs) {
-  safeStorage(() => localStorage.setItem(PREFS_KEY, JSON.stringify(p)), undefined);
-}
+export type ConfirmFn = (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
 
 /** Выполняет задачи с ограничением параллельности. */
 async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
@@ -78,7 +58,7 @@ export function useCourt(confirm: ConfirmFn) {
   }, []);
 
   const loadCase = useCallback(
-    async (id: string) => {
+    async (id: string, opts: { silent?: boolean } = {}) => {
       setError(null);
       setNotice(null);
       try {
@@ -87,7 +67,8 @@ export function useCourt(confirm: ConfirmFn) {
         return b;
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) safeStorage(() => localStorage.removeItem(LAST_CASE_KEY), undefined);
-        setError(e instanceof Error ? e.message : String(e));
+        // Автоматическое восстановление прошлого дела не должно пугать ошибкой, если дела больше нет.
+        if (!opts.silent) setError(e instanceof Error ? e.message : String(e));
         return null;
       }
     },
@@ -98,7 +79,7 @@ export function useCourt(confirm: ConfirmFn) {
     setPrefsState(loadPrefs());
     api.settings().then(setSettings).catch((e) => setError(e.message));
     const last = safeStorage(() => localStorage.getItem(LAST_CASE_KEY), null);
-    if (last) void loadCase(last);
+    if (last) void loadCase(last, { silent: true });
   }, [loadCase]);
 
   // Если дело открыто во время чужого/прерванного вызова — опрашиваем только хранилище (без вызова модели).
@@ -153,7 +134,7 @@ export function useCourt(confirm: ConfirmFn) {
         }
 
         const toRun = opts.allowPartial ? plan.pendingAgents.filter((id) => !plan.failedAgents.includes(id)) : plan.pendingAgents;
-        await pool(toRun, prefs.concurrency, async (agentId) => {
+        await pool(toRun, Math.min(prefs.concurrency, settings.maxConcurrency ?? 9), async (agentId) => {
           mark(agentId, true);
           try {
             await api.runAgent(caseId, agentId);

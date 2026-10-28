@@ -301,7 +301,7 @@ function rejectingProvider(): AIProvider & { calls: number } {
 describe("Тюрьма идей и пересмотр", () => {
   it("отклонённая идея попадает в тюрьму и не удаляется", async () => {
     const provider = rejectingProvider();
-    const { service, db } = makeService({ provider });
+    const { service, repo } = makeService({ provider });
     const c = service.createCase(IDEA);
     await runFullCourt(service, c.id);
     const b = service.bundle(c.id);
@@ -312,12 +312,12 @@ describe("Тюрьма идей и пересмотр", () => {
     expect(prison).toHaveLength(1);
     expect(prison[0]).toMatchObject({ id: c.id, decision: "rejected", conditionsForReview: ["Появятся подтверждённые предзаказы"] });
     expect(service.list({ status: "approved" })).toHaveLength(0);
-    expect((db.prepare("SELECT COUNT(*) AS n FROM cases").get() as { n: number }).n).toBe(1);
+    expect(service.list({ status: "all" })).toHaveLength(1);
   });
 
   it("повторное рассмотрение требует оснований и открывает новое заседание, сохраняя историю", async () => {
     const provider = rejectingProvider();
-    const { service, db } = makeService({ provider });
+    const { service, repo } = makeService({ provider });
     const c = service.createCase(IDEA);
     await runFullCourt(service, c.id);
 
@@ -333,7 +333,7 @@ describe("Тюрьма идей и пересмотр", () => {
     expect(b.case.optionalContext.comments).toMatch(/40 заявок/);
     expect(b.events.map((e) => e.eventType)).toContain("reopened");
     // материалы первого заседания на месте
-    expect((db.prepare("SELECT COUNT(*) AS n FROM agent_analyses WHERE round = 1").get() as { n: number }).n).toBe(9);
+    expect(repo.getAnalyses(c.id, 1).filter((a) => a.status === "done")).toHaveLength(9);
     expect(planCourt(b, false).pendingAgents).toHaveLength(9);
   });
 

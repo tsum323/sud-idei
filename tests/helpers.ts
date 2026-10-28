@@ -1,5 +1,7 @@
 import { openDatabase } from "@/server/db/db";
 import { CourtRepo } from "@/server/db/repo";
+import type { CourtStore } from "@/server/db/store";
+import { MemoryStore } from "@/artifact/memoryStore";
 import { CourtService } from "@/server/court/service";
 import { FakeProvider } from "./fixtures/fakeProvider";
 import { AIError } from "@/server/ai/errors";
@@ -39,8 +41,11 @@ export class SpyProvider implements AIProvider {
 }
 
 export function makeService(opts: { provider?: AIProvider | null; search?: SearchProvider | null; retries?: number; staleMs?: number; timeoutMs?: number } = {}) {
-  const db = openDatabase(":memory:");
-  const repo = new CourtRepo(db, opts.staleMs ?? 60_000);
+  // COURT_STORE=memory прогоняет те же тесты на хранилище страницы-артефакта.
+  const repo: CourtStore =
+    process.env.COURT_STORE === "memory"
+      ? new MemoryStore(opts.staleMs ?? 60_000)
+      : new CourtRepo(openDatabase(":memory:"), opts.staleMs ?? 60_000);
   const provider = opts.provider === undefined ? new SpyProvider() : opts.provider;
   const cfg: ServerConfig = {
     kind: "claude-code",
@@ -50,7 +55,7 @@ export function makeService(opts: { provider?: AIProvider | null; search?: Searc
     timeoutMs: opts.timeoutMs ?? 5_000,
     configError: null,
   };
-  return { db, repo, service: new CourtService(repo, cfg), provider };
+  return { repo, service: new CourtService(repo, cfg), provider };
 }
 
 export async function runFullCourt(service: CourtService, caseId: string) {

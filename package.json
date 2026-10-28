@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "build:artifact": "node scripts/build-artifact.mjs",
+    "test": "vitest run && COURT_STORE=memory vitest run tests/court.test.ts",
     "test:watch": "vitest"
   },
   "engines": {
@@ -27,6 +28,7 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "typescript": "5.9",
     "vitest": "^5.0.5"
   }

@@ -17,6 +17,9 @@ import type {
   Verdict,
 } from "@/shared/types";
 import type { AgentOutput, Decision, NewIdea } from "@/shared/schemas";
+import { CaseNotFoundError, DECISION_TO_STATUS, type CourtStore } from "./store";
+
+export { CaseNotFoundError, DECISION_TO_STATUS, type CourtStore };
 
 type Row = Record<string, unknown>;
 
@@ -30,20 +33,7 @@ const json = <T>(v: unknown, fallback: T): T => {
   }
 };
 
-export const DECISION_TO_STATUS: Record<Decision, CaseStatus> = {
-  approved: "approved",
-  conditional: "conditional",
-  rework: "rework",
-  rejected: "prison",
-};
-
-export class CaseNotFoundError extends Error {
-  constructor(id: string) {
-    super(`Дело ${id} не найдено`);
-  }
-}
-
-export class CourtRepo {
+export class CourtRepo implements CourtStore {
   /** Через сколько миллисекунд «зависший» вызов считается прерванным. */
   constructor(
     private db: DatabaseSync,
