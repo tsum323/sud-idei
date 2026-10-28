@@ -77,21 +77,39 @@ describe("адаптер Claude API", () => {
 });
 
 describe("конфигурация и секреты", () => {
-  it("без ключа провайдер не настроен, а настройки объясняют, что сделать", () => {
-    const cfg = loadConfig({} as unknown as NodeJS.ProcessEnv);
+  const env = (v: Record<string, string>) => v as unknown as NodeJS.ProcessEnv;
+  const loggedIn = () => ({ installed: true, loggedIn: true });
+
+  it("по умолчанию используется подписка через Claude Code", () => {
+    const cfg = loadConfig(env({}), { checkAuth: loggedIn });
+    expect(cfg.kind).toBe("claude-code");
+    expect(cfg.provider?.id).toBe("claude-code");
+    expect(publicSettings(cfg)).toMatchObject({ billing: "subscription", configured: true, paid: false });
+  });
+
+  it("без установленного Claude Code или без входа провайдер не готов и объясняет, что сделать", () => {
+    const notInstalled = loadConfig(env({}), { checkAuth: () => ({ installed: false, loggedIn: false }) });
+    expect(notInstalled.provider).toBeNull();
+    expect(notInstalled.configError).toMatch(/npm install -g @anthropic-ai\/claude-code/);
+    const notLogged = loadConfig(env({}), { checkAuth: () => ({ installed: true, loggedIn: false }) });
+    expect(notLogged.configError).toMatch(/claude auth login/);
+    expect(publicSettings(notLogged)).toMatchObject({ configured: false, billing: null });
+  });
+
+  it("вариант с ключом API требует ключ", () => {
+    const cfg = loadConfig(env({ AI_PROVIDER: "anthropic-api" }));
     expect(cfg.provider).toBeNull();
     expect(cfg.configError).toMatch(/ANTHROPIC_API_KEY/);
-    expect(publicSettings(cfg)).toMatchObject({ provider: null, configured: false });
   });
 
   it("публичные настройки не содержат ключей API", () => {
     const secret = "sk-ant-SECRET-123";
-    const cfg = loadConfig({ ANTHROPIC_API_KEY: secret, SEARCH_PROVIDER: "tavily", TAVILY_API_KEY: "tvly-SECRET" } as unknown as NodeJS.ProcessEnv);
+    const cfg = loadConfig(env({ AI_PROVIDER: "anthropic-api", ANTHROPIC_API_KEY: secret, SEARCH_PROVIDER: "tavily", TAVILY_API_KEY: "tvly-SECRET" }));
     expect(cfg.provider?.id).toBe("anthropic");
     const json = JSON.stringify(publicSettings(cfg));
     expect(json).not.toContain(secret);
     expect(json).not.toContain("tvly-SECRET");
-    expect(publicSettings(cfg).paid).toBe(true);
+    expect(publicSettings(cfg)).toMatchObject({ billing: "api", paid: true });
   });
 
   it("клиентский код не обращается к серверным модулям и переменным окружения", () => {

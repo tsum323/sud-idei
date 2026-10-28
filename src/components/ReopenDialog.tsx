@@ -14,13 +14,12 @@ export interface ReopenTarget {
 
 interface Props {
   target: ReopenTarget | null;
-  paid: boolean;
   onClose: () => void;
   onSubmit: (grounds: string, description?: string) => Promise<void>;
 }
 
 /** Пересмотр дела требует новых оснований — без них идея не возвращается в суд. */
-export function ReopenDialog({ target, paid, onClose, onSubmit }: Props) {
+export function ReopenDialog({ target, onClose, onSubmit }: Props) {
   const [grounds, setGrounds] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +79,7 @@ export function ReopenDialog({ target, paid, onClose, onSubmit }: Props) {
       {error && <p className="field-error">{error}</p>}
       <p className="muted small">
         Прошлые заключения и вердикт останутся в истории дела. Новое заседание начнётся после нажатия «Продолжить заседание»
-        {paid ? " — это платные вызовы модели" : ""}.
+         — это новые запросы к модели.
       </p>
     </Modal>
   );

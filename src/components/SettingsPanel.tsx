@@ -4,34 +4,48 @@ import type { Prefs } from "@/client/useCourt";
 import type { AppSettings } from "@/shared/types";
 import { Modal } from "./Modal";
 
-function SetupSteps() {
+function SetupSteps({ settings }: { settings: AppSettings }) {
+  if (settings.provider === "anthropic-api") {
+    return (
+      <ol className="setup-steps">
+        <li>Создайте ключ в Claude Console (console.anthropic.com → API Keys) и пополните баланс.</li>
+        <li>
+          Добавьте в <code>.env.local</code> строку <code>ANTHROPIC_API_KEY=sk-ant-…</code> и перезапустите сервер.
+        </li>
+      </ol>
+    );
+  }
   return (
     <ol className="setup-steps">
       <li>
-        Создайте ключ API в Claude Console (console.anthropic.com → API Keys) и пополните баланс. Доступ к API
-        оплачивается отдельно от подписки Claude Pro/Max.
+        Установите Claude Code: <code>npm install -g @anthropic-ai/claude-code</code>
       </li>
       <li>
-        В папке проекта создайте файл <code>.env.local</code> со строкой <code>ANTHROPIC_API_KEY=sk-ant-…</code>
+        Выполните в терминале <code>claude auth login</code> и войдите в аккаунт с подпиской Pro.
       </li>
-      <li>Перезапустите сервер приложения. Ключ хранится только на сервере.</li>
+      <li>Обновите эту страницу — перезапуск сервера не нужен.</li>
     </ol>
   );
 }
 
-/** Карточка вместо формы подачи, пока не настроен ключ API. */
-export function SetupNotice({ message, onOpenSettings }: { message: string | null; onOpenSettings: () => void }) {
+/** Карточка вместо формы подачи, пока провайдер не готов. */
+export function SetupNotice({ settings, onOpenSettings }: { settings: AppSettings; onOpenSettings: () => void }) {
   return (
     <div className="notice notice-warn setup-notice" role="status">
-      <b>AI-провайдер не подключён — суд пока не может заседать.</b>
-      {message && <p className="small">{message}</p>}
-      <SetupSteps />
+      <b>Суд пока не может заседать: не подключена модель Claude.</b>
+      {settings.configError && <p className="small">{settings.configError}</p>}
+      <SetupSteps settings={settings} />
       <button type="button" className="link-btn" onClick={onOpenSettings}>
         Открыть настройки
       </button>
     </div>
   );
 }
+
+const BILLING_TAG: Record<NonNullable<AppSettings["billing"]>, string> = {
+  subscription: "лимиты подписки",
+  api: "оплата по токенам",
+};
 
 interface Props {
   open: boolean;
@@ -46,12 +60,12 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
     <Modal open={open} title="НАСТРОЙКИ" variant="center" onClose={onClose}>
       {settings ? (
         <dl className="settings-list">
-          <dt>AI-провайдер</dt>
+          <dt>Модель</dt>
           <dd>
             {settings.providerLabel}
-            {settings.configured && <span className="tag tag-paid">платно</span>}
+            {settings.billing && <span className="tag tag-paid">{BILLING_TAG[settings.billing]}</span>}
           </dd>
-          {settings.model && (<><dt>Модель</dt><dd>{settings.model}, effort: {settings.effort}</dd></>)}
+          {settings.effort && (<><dt>Effort</dt><dd>{settings.effort}</dd></>)}
           <dt>Веб-поиск</dt>
           <dd>{settings.search.configured ? `Подключён (${settings.search.provider})` : "Не настроен — актуальные данные не проверяются"}</dd>
           <dt>Хранилище</dt>
@@ -63,19 +77,25 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
       {settings?.configError && <p className="notice notice-warn">{settings.configError}</p>}
       {settings && !settings.configured && (
         <div className="notice">
-          <b>Как подключить Claude API</b>
-          <SetupSteps />
+          <b>Как подключить</b>
+          <SetupSteps settings={settings} />
         </div>
+      )}
+      {settings?.billing === "subscription" && (
+        <p className="muted small">
+          Запросы идут через установленный у вас Claude Code и расходуют лимиты подписки, отдельной оплаты нет. Одно
+          заседание — около 11 запросов. Если лимит исчерпан, агенты покажут ошибку, а заседание можно продолжить после сброса.
+        </p>
       )}
 
       <h3>Параметры запуска</h3>
       <label className="field field-inline">
-        <span className="field-label">Параллельных вызовов агентов: {prefs.concurrency}</span>
+        <span className="field-label">Параллельных запросов агентов: {prefs.concurrency}</span>
         <input type="range" min={1} max={9} value={prefs.concurrency} onChange={(e) => onChange({ ...prefs, concurrency: Number(e.target.value) })} />
       </label>
       <label className="check">
         <input type="checkbox" checked={prefs.confirmPaid} onChange={(e) => onChange({ ...prefs, confirmPaid: e.target.checked })} />
-        Спрашивать подтверждение перед платным запуском
+        Спрашивать подтверждение перед запуском запросов к модели
       </label>
     </Modal>
   );

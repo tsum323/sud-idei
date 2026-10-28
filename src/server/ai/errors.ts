@@ -3,6 +3,7 @@ export type AIErrorKind =
   | "auth"
   | "bad_request"
   | "rate_limit"
+  | "quota"
   | "timeout"
   | "network"
   | "server"
@@ -14,6 +15,8 @@ const RETRYABLE: Record<AIErrorKind, boolean> = {
   auth: false,
   bad_request: false,
   rate_limit: true,
+  // лимит подписки сбрасывается через часы — повторять сразу бессмысленно
+  quota: false,
   timeout: true,
   network: true,
   server: true,
@@ -23,9 +26,10 @@ const RETRYABLE: Record<AIErrorKind, boolean> = {
 
 export const AI_ERROR_MESSAGE: Record<AIErrorKind, string> = {
   config: "AI-провайдер не настроен",
-  auth: "Ключ API отклонён — проверьте ANTHROPIC_API_KEY",
+  auth: "Нет доступа к Claude — проверьте вход (claude auth login) или ANTHROPIC_API_KEY",
   bad_request: "Провайдер отклонил запрос",
   rate_limit: "Превышен лимит запросов провайдера",
+  quota: "Исчерпан лимит подписки Claude — повторите после его сброса",
   timeout: "Превышено время ожидания ответа",
   network: "Сетевая ошибка при обращении к провайдеру",
   server: "Временная ошибка на стороне провайдера",

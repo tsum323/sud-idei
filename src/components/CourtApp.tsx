@@ -140,7 +140,7 @@ export function CourtApp() {
         />
 
         <section className="dock pixel-box" aria-label="Подача и ход заседания">
-          {notConfigured && <SetupNotice message={settings.configError} onOpenSettings={() => setPanel("settings")} />}
+          {notConfigured && <SetupNotice settings={settings} onOpenSettings={() => setPanel("settings")} />}
           {!bundle ? (
             <IdeaInput disabled={!settings || notConfigured} onSubmit={court.startCourt} />
           ) : (
@@ -205,7 +205,6 @@ export function CourtApp() {
       <AllConclusionsPanel open={panel === "all"} bundle={bundle} onClose={() => setPanel(null)} />
       <ReopenDialog
         target={reopenTarget}
-        paid={!!settings?.paid}
         onClose={() => setReopenTarget(null)}
         onSubmit={async (grounds, description) => {
           await court.reopen(reopenTarget!.id, grounds, description);

@@ -111,12 +111,17 @@ export function useCourt(confirm: ConfirmFn) {
     return () => clearInterval(t);
   }, [bundle, hasServerRunning, inflight.size, refresh]);
 
+  /** Подтверждение перед вызовами модели: они тратят лимиты подписки или деньги на API. */
   const confirmPaid = useCallback(
     async (calls: number, what: string) => {
-      if (!settings?.paid || !prefs.confirmPaid) return true;
+      if (!settings?.billing || !prefs.confirmPaid) return true;
+      const cost =
+        settings.billing === "subscription"
+          ? "Запросы расходуют лимиты вашей подписки Claude."
+          : "Вызовы Claude API оплачиваются по токенам.";
       return confirm({
-        title: "Платный запуск",
-        message: `${what}: около ${calls} вызов(ов) модели ${settings.model}. Вызовы Claude API оплачиваются по токенам. Продолжить?`,
+        title: settings.billing === "subscription" ? "Запуск по подписке" : "Платный запуск",
+        message: `${what}: около ${calls} запрос(ов) к модели ${settings.model}. ${cost} Продолжить?`,
         confirmLabel: "Запустить",
       });
     },
@@ -205,10 +210,7 @@ export function useCourt(confirm: ConfirmFn) {
   const startCourt = useCallback(
     async (idea: NewIdeaInput): Promise<boolean> => {
       if (!settings) return false;
-      if (settings.paid && prefs.confirmPaid) {
-        const ok = await confirmPaid(11, "Новое заседание");
-        if (!ok) return false;
-      }
+      if (!(await confirmPaid(11, "Новое заседание"))) return false;
       setError(null);
       try {
         const b = await api.createCase(idea);
@@ -221,7 +223,7 @@ export function useCourt(confirm: ConfirmFn) {
         return false;
       }
     },
-    [settings, prefs.confirmPaid, confirmPaid, runSession],
+    [settings, confirmPaid, runSession],
   );
 
   /** Повтор анализа одного агента. Повтор готового заключения требует подтверждения. */
@@ -233,7 +235,7 @@ export function useCourt(confirm: ConfirmFn) {
       if (force) {
         const ok = await confirm({
           title: "Повторный анализ",
-          message: `Заключение агента «${agentName(agentId)}» уже получено. Заменить его новым${settings?.paid ? " (платный вызов модели)" : ""}?`,
+          message: `Заключение агента «${agentName(agentId)}» уже получено. Заменить его новым? Это ещё один запрос к модели.`,
           confirmLabel: "Повторить",
         });
         if (!ok) return;
@@ -251,7 +253,7 @@ export function useCourt(confirm: ConfirmFn) {
         await refresh(bundle.case.id).catch(() => undefined);
       }
     },
-    [bundle, confirm, confirmPaid, refresh, settings?.paid],
+    [bundle, confirm, confirmPaid, refresh],
   );
 
   const reopen = useCallback(async (caseId: string, grounds: string, description?: string) => {

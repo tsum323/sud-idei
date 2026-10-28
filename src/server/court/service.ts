@@ -18,7 +18,7 @@ import { systemPromptFor } from "../agents/roles";
 import type { CourtRepo } from "../db/repo";
 import { buildQueries } from "../evidence/search";
 import { runJudge } from "../judge/judge";
-import { MISSING_KEY_MESSAGE, type ServerConfig } from "../config";
+import { NOT_CONFIGURED_MESSAGE, type ServerConfig } from "../config";
 import type { AIProvider } from "../ai/types";
 import { agentPrompt, CROSS_EXAM_SYSTEM, crossExamPrompt } from "./prompts";
 
@@ -64,7 +64,7 @@ export class CourtService {
 
   /** Без настроенного провайдера платные этапы не стартуют и ничего не помечают «в работе». */
   private requireProvider(): AIProvider {
-    if (!this.cfg.provider) throw new CourtError(503, MISSING_KEY_MESSAGE);
+    if (!this.cfg.provider) throw new CourtError(503, NOT_CONFIGURED_MESSAGE);
     return this.cfg.provider;
   }
 

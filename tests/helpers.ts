@@ -38,15 +38,16 @@ export class SpyProvider implements AIProvider {
   }
 }
 
-export function makeService(opts: { provider?: AIProvider | null; search?: SearchProvider | null; retries?: number; staleMs?: number } = {}) {
+export function makeService(opts: { provider?: AIProvider | null; search?: SearchProvider | null; retries?: number; staleMs?: number; timeoutMs?: number } = {}) {
   const db = openDatabase(":memory:");
   const repo = new CourtRepo(db, opts.staleMs ?? 60_000);
   const provider = opts.provider === undefined ? new SpyProvider() : opts.provider;
   const cfg: ServerConfig = {
+    kind: "claude-code",
     provider,
     search: opts.search ?? null,
     retries: opts.retries ?? 0,
-    timeoutMs: 5_000,
+    timeoutMs: opts.timeoutMs ?? 5_000,
     configError: null,
   };
   return { db, repo, service: new CourtService(repo, cfg), provider };

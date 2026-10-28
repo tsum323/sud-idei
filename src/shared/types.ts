@@ -180,9 +180,10 @@ export interface CaseSummary {
 }
 
 export interface AppSettings {
-  /** null — AI-провайдер не настроен, заседания запускать нельзя. */
-  provider: "anthropic" | null;
+  provider: "claude-code" | "anthropic-api";
   providerLabel: string;
+  /** subscription — расходует лимиты подписки Claude; api — оплата по токенам; null — провайдер не готов. */
+  billing: "subscription" | "api" | null;
   model: string | null;
   effort: string | null;
   paid: boolean;
