@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AIError } from "@/server/ai/errors";
 import type { AIProvider, AIRequest } from "@/server/ai/types";
-import { DemoProvider } from "@/server/ai/demo";
+import { FakeProvider } from "./fixtures/fakeProvider";
 import type { SearchProvider } from "@/server/evidence/search";
 import { AGENT_IDS } from "@/shared/agents";
 import { planCourt } from "@/shared/courtPlan";
@@ -30,9 +30,9 @@ describe("анализ агентов", () => {
   it("сохраняет результат агента и помечает «Готов» только после получения результата", async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const inner = new DemoProvider({ latencyMs: 0 });
+    const inner = new FakeProvider({ latencyMs: 0 });
     const slow: AIProvider = {
-      id: "demo", label: "slow", paid: false, model: null,
+      id: "fake", label: "slow", paid: false, model: null,
       async generate<T>(req: AIRequest<T>) {
         await gate;
         return inner.generate(req);
@@ -118,6 +118,15 @@ describe("анализ агентов", () => {
 });
 
 describe("ошибки AI-провайдера", () => {
+  it("без настроенного провайдера этапы не запускаются и ничего не помечается «в работе»", async () => {
+    const { service } = makeService({ provider: null });
+    const c = service.createCase(IDEA);
+    await expect(service.runAgent(c.id, "market")).rejects.toMatchObject({ status: 503 });
+    const b = service.bundle(c.id);
+    expect(b.analyses).toHaveLength(0);
+    expect(b.case.status).toBe("draft");
+  });
+
   it("временные ошибки повторяются ограниченное число раз", async () => {
     const provider = new SpyProvider();
     provider.failNext("agent:market", new AIError("rate_limit"), new AIError("network"));
@@ -175,9 +184,9 @@ describe("перекрёстная критика и вердикт", () => {
   });
 
   it("перекрёстная критика отбрасывает выдуманных агентов и ограничивает число вопросов", async () => {
-    const inner = new DemoProvider({ latencyMs: 0 });
+    const inner = new FakeProvider({ latencyMs: 0 });
     const provider: AIProvider = {
-      id: "demo", label: "t", paid: false, model: null,
+      id: "fake", label: "t", paid: false, model: null,
       async generate<T>(req: AIRequest<T>) {
         if (req.input.task !== "cross_exam") return inner.generate(req);
         const issue = (o: string, c: string) => ({
@@ -228,9 +237,9 @@ describe("перекрёстная критика и вердикт", () => {
   });
 
   it("судья не выдаёт неподтверждённые предположения за факты", async () => {
-    const inner = new DemoProvider({ latencyMs: 0 });
+    const inner = new FakeProvider({ latencyMs: 0 });
     const provider: AIProvider = {
-      id: "demo", label: "t", paid: false, model: null,
+      id: "fake", label: "t", paid: false, model: null,
       async generate<T>(req: AIRequest<T>) {
         const out = (await inner.generate(req)) as Record<string, unknown>;
         if (req.input.task === "agent") {
@@ -274,9 +283,9 @@ describe("перекрёстная критика и вердикт", () => {
 
 /** Провайдер, судья которого всегда отклоняет идею. */
 function rejectingProvider(): AIProvider & { calls: number } {
-  const inner = new DemoProvider({ latencyMs: 0 });
+  const inner = new FakeProvider({ latencyMs: 0 });
   return {
-    id: "demo", label: "t", paid: false, model: null, calls: 0,
+    id: "fake", label: "t", paid: false, model: null, calls: 0,
     async generate<T>(req: AIRequest<T>) {
       this.calls++;
       const out = (await inner.generate(req)) as Record<string, unknown>;

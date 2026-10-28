@@ -77,16 +77,17 @@ describe("адаптер Claude API", () => {
 });
 
 describe("конфигурация и секреты", () => {
-  it("без ключа включается демо-режим с явным предупреждением", () => {
-    const cfg = loadConfig({ AI_PROVIDER: "anthropic" } as unknown as NodeJS.ProcessEnv);
-    expect(cfg.provider.id).toBe("demo");
+  it("без ключа провайдер не настроен, а настройки объясняют, что сделать", () => {
+    const cfg = loadConfig({} as unknown as NodeJS.ProcessEnv);
+    expect(cfg.provider).toBeNull();
     expect(cfg.configError).toMatch(/ANTHROPIC_API_KEY/);
+    expect(publicSettings(cfg)).toMatchObject({ provider: null, configured: false });
   });
 
   it("публичные настройки не содержат ключей API", () => {
     const secret = "sk-ant-SECRET-123";
-    const cfg = loadConfig({ AI_PROVIDER: "anthropic", ANTHROPIC_API_KEY: secret, SEARCH_PROVIDER: "tavily", TAVILY_API_KEY: "tvly-SECRET" } as unknown as NodeJS.ProcessEnv);
-    expect(cfg.provider.id).toBe("anthropic");
+    const cfg = loadConfig({ ANTHROPIC_API_KEY: secret, SEARCH_PROVIDER: "tavily", TAVILY_API_KEY: "tvly-SECRET" } as unknown as NodeJS.ProcessEnv);
+    expect(cfg.provider?.id).toBe("anthropic");
     const json = JSON.stringify(publicSettings(cfg));
     expect(json).not.toContain(secret);
     expect(json).not.toContain("tvly-SECRET");

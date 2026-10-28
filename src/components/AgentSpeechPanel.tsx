@@ -18,14 +18,13 @@ interface Props {
   crossExaminations: CrossExamination[];
   evidence: Evidence[];
   canRun: boolean;
-  isDemo: boolean;
   style?: React.CSSProperties;
   onClose: () => void;
   onRetry: () => void;
 }
 
 /** Панель заключения агента: сначала краткий вывод, подробности — по запросу. */
-export function AgentSpeechPanel({ meta, analysis, running, crossExaminations, evidence, canRun, isDemo, style, onClose, onRetry }: Props) {
+export function AgentSpeechPanel({ meta, analysis, running, crossExaminations, evidence, canRun, style, onClose, onRetry }: Props) {
   const [details, setDetails] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const status = running ? "running" : (analysis?.status ?? "idle");
@@ -68,7 +67,6 @@ export function AgentSpeechPanel({ meta, analysis, running, crossExaminations, e
             <span className="tag">Оценка: {a.overallScore}/100</span>
             <span className={`tag stance-${a.stance}`}>{STANCE_LABEL[a.stance ?? "neutral"]}</span>
             <span className="tag">уверенность: {CONFIDENCE_LABEL[a.confidence ?? "low"]}</span>
-            {isDemo && <span className="tag tag-demo">демо</span>}
           </>
         )}
       </div>

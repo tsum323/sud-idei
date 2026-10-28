@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type { AgentId, AgentAnalysis, CrossExamination, Evidence, IdeaCase } from "@/shared/types";
 import type { AggregatedCriterion } from "@/shared/scoring";
 
-/** Структурированные входные данные задачи — нужны демо-провайдеру и для журнала. */
+/** Структурированные входные данные задачи (используются тестовым провайдером и для журнала). */
 export type AITaskInput =
   | { task: "agent"; agentId: AgentId; idea: IdeaCase; evidence: Evidence[] }
   | { task: "cross_exam"; idea: IdeaCase; analyses: AgentAnalysis[] }
@@ -25,7 +25,7 @@ export interface AIRequest<T> {
 }
 
 export interface AIProvider {
-  readonly id: "demo" | "anthropic";
+  readonly id: string;
   readonly label: string;
   /** Платный ли провайдер — от этого зависят предупреждения в интерфейсе. */
   readonly paid: boolean;

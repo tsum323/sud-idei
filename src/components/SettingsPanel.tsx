@@ -4,6 +4,35 @@ import type { Prefs } from "@/client/useCourt";
 import type { AppSettings } from "@/shared/types";
 import { Modal } from "./Modal";
 
+function SetupSteps() {
+  return (
+    <ol className="setup-steps">
+      <li>
+        Создайте ключ API в Claude Console (console.anthropic.com → API Keys) и пополните баланс. Доступ к API
+        оплачивается отдельно от подписки Claude Pro/Max.
+      </li>
+      <li>
+        В папке проекта создайте файл <code>.env.local</code> со строкой <code>ANTHROPIC_API_KEY=sk-ant-…</code>
+      </li>
+      <li>Перезапустите сервер приложения. Ключ хранится только на сервере.</li>
+    </ol>
+  );
+}
+
+/** Карточка вместо формы подачи, пока не настроен ключ API. */
+export function SetupNotice({ message, onOpenSettings }: { message: string | null; onOpenSettings: () => void }) {
+  return (
+    <div className="notice notice-warn setup-notice" role="status">
+      <b>AI-провайдер не подключён — суд пока не может заседать.</b>
+      {message && <p className="small">{message}</p>}
+      <SetupSteps />
+      <button type="button" className="link-btn" onClick={onOpenSettings}>
+        Открыть настройки
+      </button>
+    </div>
+  );
+}
+
 interface Props {
   open: boolean;
   settings: AppSettings | null;
@@ -20,7 +49,7 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
           <dt>AI-провайдер</dt>
           <dd>
             {settings.providerLabel}
-            {settings.paid ? <span className="tag tag-paid">платно</span> : <span className="tag tag-demo">бесплатно</span>}
+            {settings.configured && <span className="tag tag-paid">платно</span>}
           </dd>
           {settings.model && (<><dt>Модель</dt><dd>{settings.model}, effort: {settings.effort}</dd></>)}
           <dt>Веб-поиск</dt>
@@ -32,11 +61,10 @@ export function SettingsPanel({ open, settings, prefs, onChange, onClose }: Prop
         <p className="muted">Загрузка…</p>
       )}
       {settings?.configError && <p className="notice notice-warn">{settings.configError}</p>}
-      {settings?.provider === "demo" && (
+      {settings && !settings.configured && (
         <div className="notice">
-          <b>Как подключить реальную модель.</b> Создайте ключ в Claude Console (console.anthropic.com) — доступ к API
-          оплачивается отдельно от подписки Claude Pro/Max. Затем в файле <code>.env.local</code> укажите
-          <code> AI_PROVIDER=anthropic</code> и <code>ANTHROPIC_API_KEY=…</code> и перезапустите сервер. Ключ хранится только на сервере.
+          <b>Как подключить Claude API</b>
+          <SetupSteps />
         </div>
       )}
 

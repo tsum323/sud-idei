@@ -116,7 +116,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   white-space: nowrap;
   vertical-align: middle;
 }
-.tag-demo { border-color: var(--yellow); color: var(--yellow); }
 .tag-paid { border-color: var(--orange); color: var(--orange); margin-left: 6px; }
 .kind-fact { border-color: var(--green); color: var(--green); }
 .kind-assumption { border-color: var(--muted); color: var(--muted); }
@@ -148,7 +147,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .case-no { font-family: var(--pixel); font-size: 0.6rem; color: var(--muted); border: 2px solid var(--line); padding: 6px 8px; }
 .topnav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-.demo-banner {
+.banner {
   margin: 0 0 12px;
   padding: 8px 12px;
   background: repeating-linear-gradient(-45deg, #2a2140 0 10px, #251c3b 10px 20px);
@@ -156,7 +155,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--yellow);
   font-size: 0.85rem;
 }
-.demo-banner-warn { border-color: var(--red); color: #ffb0a8; }
+.banner-warn { border-color: var(--red); color: #ffb0a8; }
+.setup-notice { margin-top: 0; }
+.setup-steps { margin: 8px 0 4px; padding-left: 22px; }
+.setup-steps li { margin: 4px 0; }
 
 .main { display: flex; flex-direction: column; gap: 16px; }
 

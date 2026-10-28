@@ -27,14 +27,13 @@ interface Props {
   bundle: CaseBundle | null;
   plan: CourtPlan | null;
   inflight: Set<string>;
-  isDemo: boolean;
   judgeCaption: string;
   verdictSlot?: React.ReactNode;
   canRun: boolean;
   onRetryAgent: (id: AgentId) => void;
 }
 
-export function CourtScene({ bundle, plan, inflight, isDemo, judgeCaption, verdictSlot, canRun, onRetryAgent }: Props) {
+export function CourtScene({ bundle, plan, inflight, judgeCaption, verdictSlot, canRun, onRetryAgent }: Props) {
   const [openAgent, setOpenAgent] = useState<AgentId | null>(null);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>();
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -94,7 +93,6 @@ export function CourtScene({ bundle, plan, inflight, isDemo, judgeCaption, verdi
       crossExaminations={bundle?.crossExaminations ?? []}
       evidence={bundle?.evidence ?? []}
       canRun={canRun}
-      isDemo={isDemo}
       style={wide ? panelStyle : undefined}
       onClose={close}
       onRetry={() => onRetryAgent(meta.id)}

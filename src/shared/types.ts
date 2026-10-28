@@ -180,7 +180,8 @@ export interface CaseSummary {
 }
 
 export interface AppSettings {
-  provider: "demo" | "anthropic";
+  /** null — AI-провайдер не настроен, заседания запускать нельзя. */
+  provider: "anthropic" | null;
   providerLabel: string;
   model: string | null;
   effort: string | null;

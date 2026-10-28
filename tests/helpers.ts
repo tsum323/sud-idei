@@ -1,7 +1,7 @@
 import { openDatabase } from "@/server/db/db";
 import { CourtRepo } from "@/server/db/repo";
 import { CourtService } from "@/server/court/service";
-import { DemoProvider } from "@/server/ai/demo";
+import { FakeProvider } from "./fixtures/fakeProvider";
 import { AIError } from "@/server/ai/errors";
 import type { AIProvider, AIRequest } from "@/server/ai/types";
 import type { ServerConfig } from "@/server/config";
@@ -17,13 +17,13 @@ export const IDEA = {
 
 /** Провайдер-обёртка: считает вызовы и позволяет «ронять» выбранные задачи. */
 export class SpyProvider implements AIProvider {
-  readonly id = "demo" as const;
+  readonly id = "fake";
   readonly label = "spy";
   readonly paid = false;
   readonly model = null;
   calls: string[] = [];
   failures = new Map<string, AIError[]>();
-  private inner = new DemoProvider({ latencyMs: 0 });
+  private inner = new FakeProvider({ latencyMs: 0 });
 
   failNext(key: string, ...errors: AIError[]) {
     this.failures.set(key, errors);
@@ -38,10 +38,10 @@ export class SpyProvider implements AIProvider {
   }
 }
 
-export function makeService(opts: { provider?: AIProvider; search?: SearchProvider | null; retries?: number; staleMs?: number } = {}) {
+export function makeService(opts: { provider?: AIProvider | null; search?: SearchProvider | null; retries?: number; staleMs?: number } = {}) {
   const db = openDatabase(":memory:");
   const repo = new CourtRepo(db, opts.staleMs ?? 60_000);
-  const provider = opts.provider ?? new SpyProvider();
+  const provider = opts.provider === undefined ? new SpyProvider() : opts.provider;
   const cfg: ServerConfig = {
     provider,
     search: opts.search ?? null,

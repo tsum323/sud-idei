@@ -18,7 +18,8 @@ import { systemPromptFor } from "../agents/roles";
 import type { CourtRepo } from "../db/repo";
 import { buildQueries } from "../evidence/search";
 import { runJudge } from "../judge/judge";
-import type { ServerConfig } from "../config";
+import { MISSING_KEY_MESSAGE, type ServerConfig } from "../config";
+import type { AIProvider } from "../ai/types";
 import { agentPrompt, CROSS_EXAM_SYSTEM, crossExamPrompt } from "./prompts";
 
 export class CourtError extends Error {
@@ -59,6 +60,12 @@ export class CourtService {
     repo.upsertAgents(
       AGENTS.map((a) => ({ id: a.id, name: a.name, role: a.role, systemPrompt: systemPromptFor(a.id), visualStyle: a.visualStyle })),
     );
+  }
+
+  /** Без настроенного провайдера платные этапы не стартуют и ничего не помечают «в работе». */
+  private requireProvider(): AIProvider {
+    if (!this.cfg.provider) throw new CourtError(503, MISSING_KEY_MESSAGE);
+    return this.cfg.provider;
   }
 
   private call<T>(fn: () => Promise<T>): Promise<T> {
@@ -127,12 +134,13 @@ export class CourtService {
   async runAgent(caseId: string, agentId: AgentId, opts: RunOptions = {}): Promise<AgentAnalysis> {
     if (!AGENT_IDS.includes(agentId)) throw new CourtError(400, `Неизвестный агент: ${agentId}`);
     const c = this.repo.getCase(caseId);
+    const provider = this.requireProvider();
     if (this.repo.getBundle(caseId).verdict) {
       throw new CourtError(409, "Вердикт уже вынесен. Чтобы пересмотреть дело, откройте повторное рассмотрение.");
     }
     const existing = this.repo.getAnalysis(caseId, c.round, agentId);
     if (existing?.status === "done" && !opts.force) return existing;
-    if (!this.repo.tryStartAgent(caseId, c.round, agentId, this.cfg.provider.label)) {
+    if (!this.repo.tryStartAgent(caseId, c.round, agentId, provider.label)) {
       throw new CourtError(409, `${agentName(agentId)} уже анализирует дело`);
     }
     this.repo.addEvent(caseId, c.round, "agent_started", `${agentName(agentId)}: анализ начат`);
@@ -140,7 +148,7 @@ export class CourtService {
     const evidence = this.repo.getEvidence(caseId, c.round);
     try {
       const raw = await this.call(() =>
-        this.cfg.provider.generate<AgentOutput>({
+        provider.generate<AgentOutput>({
           input: { task: "agent", agentId, idea: c, evidence },
           system: systemPromptFor(agentId),
           prompt: agentPrompt(c, evidence),
@@ -170,11 +178,12 @@ export class CourtService {
     const done = b.analyses.filter((a) => a.status === "done");
     if (b.analyses.some((a) => a.status === "running")) throw new CourtError(409, "Дождитесь завершения анализа агентов");
     if (done.length < 2) throw new CourtError(409, "Для перекрёстной критики нужны заключения хотя бы двух агентов");
+    const provider = this.requireProvider();
     if (!this.repo.tryStartStage(caseId, round, "cross_exam")) throw new CourtError(409, "Перекрёстная критика уже идёт");
 
     try {
       const raw = await this.call(() =>
-        this.cfg.provider.generate<CrossExamOutput>({
+        provider.generate<CrossExamOutput>({
           input: { task: "cross_exam", idea: b.case, analyses: done },
           system: CROSS_EXAM_SYSTEM,
           prompt: crossExamPrompt(b.case, done, findScoreConflicts(done)),
@@ -212,11 +221,12 @@ export class CourtService {
         missing,
       });
     }
+    const provider = this.requireProvider();
     if (!this.repo.tryStartStage(caseId, round, "verdict")) throw new CourtError(409, "Судья уже совещается");
 
     try {
       const result = await runJudge(
-        this.cfg.provider,
+        provider,
         {
           idea: b.case,
           analyses: done,

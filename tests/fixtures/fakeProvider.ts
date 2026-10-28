@@ -1,16 +1,14 @@
-import "server-only";
 import { agentName } from "@/shared/agents";
 import { CRITERIA, type CriterionKey } from "@/shared/criteria";
 import type { AgentOutput, AgentScore, Claim, CrossExamOutput, RiskItem, VerdictOutput } from "@/shared/schemas";
 import { clampScore, computeOverallScore, countCriticalRisks, suggestDecision } from "@/shared/scoring";
 import type { AgentAnalysis, AgentId, Evidence, IdeaCase } from "@/shared/types";
-import { AIError } from "./errors";
-import type { AIProvider, AIRequest, AITaskInput } from "./types";
+import { AIError } from "@/server/ai/errors";
+import type { AIProvider, AIRequest, AITaskInput } from "@/server/ai/types";
 
 /**
- * Демонстрационный провайдер. Не обращается к сети и ничего не стоит.
- * Заключения строятся шаблонами по ключевым словам описания — это тестовые данные,
- * а не настоящий анализ, и в интерфейсе они помечены как демо.
+ * Тестовый провайдер: детерминированно строит схемно-корректные ответы по шаблонам,
+ * чтобы проверять логику суда без сети и оплаты. В приложении не используется.
  */
 
 interface Signals {
@@ -148,7 +146,7 @@ function commonUnknowns(s: Signals): string[] {
   return u;
 }
 
-function demoAgent(id: AgentId, idea: IdeaCase, evidence: Evidence[], s: Signals): AgentOutput {
+function fakeAgent(id: AgentId, idea: IdeaCase, evidence: Evidence[], s: Signals): AgentOutput {
   const scorecard = agentScorecard(id, s);
   const overallScore = clampScore(scorecard.reduce((x, y) => x + y.score, 0) / scorecard.length);
   const t = idea.title;
@@ -280,12 +278,11 @@ function demoAgent(id: AgentId, idea: IdeaCase, evidence: Evidence[], s: Signals
     unknowns: unknowns.slice(0, 6),
     recommendations,
     fullText:
-      `${summary}\n\nДемонстрационное заключение: сгенерировано шаблоном без обращения к AI. ` +
-      `Подключите реальную модель (AI_PROVIDER=anthropic), чтобы получить содержательный анализ роли «${agentName(id)}».`,
+      `${summary}\n\nТестовое заключение роли «${agentName(id)}».`,
   };
 }
 
-function demoCrossExam(analyses: AgentAnalysis[]): CrossExamOutput {
+function fakeCrossExam(analyses: AgentAnalysis[]): CrossExamOutput {
   const done = new Map(analyses.filter((x) => x.status === "done").map((x) => [x.agentId, x]));
   const pairs: [AgentId, AgentId, string][] = [
     ["advocate", "prosecutor", "Есть ли у идеи реальный спрос"],
@@ -314,7 +311,7 @@ function demoCrossExam(analyses: AgentAnalysis[]): CrossExamOutput {
 
 const trimDot = (s?: string) => (s ?? "").replace(/[.\s]+$/, "");
 
-function demoVerdict(input: Extract<AITaskInput, { task: "verdict" }>): VerdictOutput {
+function fakeVerdict(input: Extract<AITaskInput, { task: "verdict" }>): VerdictOutput {
   const { analyses, aggregated, idea, crossExaminations } = input;
   const done = analyses.filter((x) => x.status === "done");
   const criteria = CRITERIA.map((c) => {
@@ -351,7 +348,7 @@ function demoVerdict(input: Extract<AITaskInput, { task: "verdict" }>): VerdictO
           : decision === "rework"
             ? "Сначала уточнить проблему и аудиторию"
             : "При текущих условиях дальнейшие усилия не оправданы",
-    summary: `Демо-вердикт по делу «${idea.title}»: решение сформировано по правилам демо-режима из оценок агентов, без участия AI.`,
+    summary: `Тестовый вердикт по делу «${idea.title}», сформированный из оценок агентов.`,
     reasoning:
       `Решающим стал вопрос спроса: ${con ? `обвинение указывает: «${trimDot(con.summary)}»` : "заключение обвинения отсутствует"}; ` +
       `${pro ? `защита отвечает: «${trimDot(pro.summary)}»` : "заключение защиты отсутствует"}. ` +
@@ -376,9 +373,9 @@ function demoVerdict(input: Extract<AITaskInput, { task: "verdict" }>): VerdictO
   };
 }
 
-export class DemoProvider implements AIProvider {
-  readonly id = "demo" as const;
-  readonly label = "Демо-режим (тестовые данные, без AI)";
+export class FakeProvider implements AIProvider {
+  readonly id = "fake";
+  readonly label = "Тестовый провайдер";
   readonly paid = false;
   readonly model = null;
 
@@ -391,12 +388,12 @@ export class DemoProvider implements AIProvider {
       await new Promise((r) => setTimeout(r, this.opts.latencyMs * (0.6 + (seed % 80) / 100)));
     }
     if (input.task === "agent" && this.opts.failAgent === input.agentId) {
-      throw new AIError("server", "демо-сбой, заданный DEMO_FAIL_AGENT");
+      throw new AIError("server", "тестовый сбой");
     }
     let out: unknown;
-    if (input.task === "agent") out = demoAgent(input.agentId, input.idea, input.evidence, extractSignals(input.idea));
-    else if (input.task === "cross_exam") out = demoCrossExam(input.analyses);
-    else out = demoVerdict(input);
+    if (input.task === "agent") out = fakeAgent(input.agentId, input.idea, input.evidence, extractSignals(input.idea));
+    else if (input.task === "cross_exam") out = fakeCrossExam(input.analyses);
+    else out = fakeVerdict(input);
     return req.schema.parse(out);
   }
 }

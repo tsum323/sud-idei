@@ -1,7 +1,6 @@
 import "server-only";
 import type { AppSettings } from "@/shared/types";
 import { AnthropicProvider, type Effort } from "./ai/anthropic";
-import { DemoProvider } from "./ai/demo";
 import type { AIProvider } from "./ai/types";
 import { databasePath } from "./db/db";
 import { TavilySearch, type SearchProvider } from "./evidence/search";
@@ -9,51 +8,45 @@ import { TavilySearch, type SearchProvider } from "./evidence/search";
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 export interface ServerConfig {
-  provider: AIProvider;
+  /** null — ключ не задан: заседания не запускаются, пока провайдер не настроен. */
+  provider: AIProvider | null;
   search: SearchProvider | null;
   retries: number;
   timeoutMs: number;
   configError: string | null;
 }
 
+export const MISSING_KEY_MESSAGE =
+  "Не задан ANTHROPIC_API_KEY. Добавьте ключ в файл .env.local и перезапустите сервер.";
+
 /** Читает настройки из переменных окружения. Ключи никогда не покидают сервер. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const timeoutMs = Number(env.AI_TIMEOUT_MS) || 180_000;
   const retries = Math.max(0, Math.min(5, Number(env.AI_MAX_RETRIES ?? 2) || 0));
-  let configError: string | null = null;
-  let provider: AIProvider;
+  const errors: string[] = [];
 
-  const wanted = (env.AI_PROVIDER || "demo").toLowerCase();
-  if (wanted === "anthropic") {
-    const key = env.ANTHROPIC_API_KEY?.trim();
-    if (!key) {
-      configError = "AI_PROVIDER=anthropic, но ANTHROPIC_API_KEY не задан — включён демо-режим";
-      provider = new DemoProvider({ latencyMs: Number(env.DEMO_LATENCY_MS ?? 900) });
-    } else {
-      const effort = EFFORTS.includes(env.AI_EFFORT as Effort) ? (env.AI_EFFORT as Effort) : "medium";
-      provider = new AnthropicProvider({
-        apiKey: key,
-        model: env.AI_MODEL?.trim() || "claude-opus-5-5",
-        effort,
-        timeoutMs,
-        fallbacks: (env.AI_FALLBACKS ?? "on").toLowerCase() !== "off",
-      });
-    }
-  } else {
-    if (wanted !== "demo") configError = `Неизвестный AI_PROVIDER «${wanted}» — включён демо-режим`;
-    provider = new DemoProvider({
-      latencyMs: Number(env.DEMO_LATENCY_MS ?? 900),
-      failAgent: env.DEMO_FAIL_AGENT?.trim() || undefined,
+  let provider: AIProvider | null = null;
+  const key = env.ANTHROPIC_API_KEY?.trim();
+  if (key) {
+    const effort = EFFORTS.includes(env.AI_EFFORT as Effort) ? (env.AI_EFFORT as Effort) : "medium";
+    provider = new AnthropicProvider({
+      apiKey: key,
+      model: env.AI_MODEL?.trim() || "claude-opus-5-5",
+      effort,
+      timeoutMs,
+      fallbacks: (env.AI_FALLBACKS ?? "on").toLowerCase() !== "off",
     });
+  } else {
+    errors.push(MISSING_KEY_MESSAGE);
   }
 
   let search: SearchProvider | null = null;
   if ((env.SEARCH_PROVIDER || "none").toLowerCase() === "tavily") {
     if (env.TAVILY_API_KEY?.trim()) search = new TavilySearch(env.TAVILY_API_KEY.trim());
-    else configError = [configError, "SEARCH_PROVIDER=tavily, но TAVILY_API_KEY не задан — поиск отключён"].filter(Boolean).join("; ");
+    else errors.push("SEARCH_PROVIDER=tavily, но TAVILY_API_KEY не задан — поиск отключён");
   }
 
-  return { provider, search, retries, timeoutMs, configError };
+  return { provider, search, retries, timeoutMs, configError: errors.length ? errors.join(" ") : null };
 }
 
 let cached: ServerConfig | null = null;
@@ -65,12 +58,12 @@ export function getConfig(): ServerConfig {
 export function publicSettings(cfg: ServerConfig): AppSettings {
   const p = cfg.provider;
   return {
-    provider: p.id,
-    providerLabel: p.label,
-    model: p.model,
+    provider: p ? "anthropic" : null,
+    providerLabel: p ? p.label : "Не настроен",
+    model: p?.model ?? null,
     effort: p instanceof AnthropicProvider ? p.effort : null,
-    paid: p.paid,
-    configured: p.id === "anthropic",
+    paid: Boolean(p?.paid),
+    configured: Boolean(p),
     configError: cfg.configError,
     search: { provider: cfg.search ? cfg.search.id : "none", configured: Boolean(cfg.search) },
     databasePath: databasePath(),

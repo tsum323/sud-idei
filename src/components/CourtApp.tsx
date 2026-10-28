@@ -18,7 +18,7 @@ import { IdeaPrisonPanel } from "./IdeaPrisonPanel";
 import { STATUS_TEXT } from "./labels";
 import { ReopenDialog, type ReopenTarget } from "./ReopenDialog";
 import { ReportPanel } from "./ReportPanel";
-import { SettingsPanel } from "./SettingsPanel";
+import { SettingsPanel, SetupNotice } from "./SettingsPanel";
 import { VerdictPanel } from "./VerdictPanel";
 
 type Panel = null | "archive" | "prison" | "settings" | "report" | "all";
@@ -90,12 +90,12 @@ export function CourtApp() {
     return plan ? STAGE_LABEL[plan.stage] : "";
   })();
 
+  const notConfigured = !!settings && !settings.configured;
   const doneCount = plan?.doneAgents.length ?? 0;
   const runningCount = bundle
     ? AGENT_IDS.filter((id) => inflight.has(id) || bundle.analyses.some((a) => a.agentId === id && a.status === "running")).length
     : 0;
-  const canContinue = !!bundle && !verdict && !busy;
-  const isDemo = settings?.provider === "demo";
+  const canContinue = !!bundle && !verdict && !busy && !notConfigured;
 
   return (
     <div className="app">
@@ -113,21 +113,15 @@ export function CourtApp() {
         </nav>
       </header>
 
-      {isDemo && (
-        <p className="demo-banner" role="status">
-          ДЕМО-РЕЖИМ: заключения — тестовые данные, сгенерированные шаблонами без AI. Подключение модели — в настройках ⚙
-        </p>
-      )}
-      {settings?.configError && <p className="demo-banner demo-banner-warn">{settings.configError}</p>}
+      {settings?.configError && settings.configured && <p className="banner banner-warn">{settings.configError}</p>}
 
       <main className="main">
         <CourtScene
           bundle={bundle}
           plan={plan}
           inflight={inflight}
-          isDemo={isDemo}
           judgeCaption={judgeCaption}
-          canRun={!!bundle && !verdict}
+          canRun={!!bundle && !verdict && !notConfigured}
           onRetryAgent={court.retryAgent}
           verdictSlot={
             verdict && verdictOpen && bundle ? (
@@ -146,8 +140,9 @@ export function CourtApp() {
         />
 
         <section className="dock pixel-box" aria-label="Подача и ход заседания">
+          {notConfigured && <SetupNotice message={settings.configError} onOpenSettings={() => setPanel("settings")} />}
           {!bundle ? (
-            <IdeaInput disabled={!settings} onSubmit={court.startCourt} />
+            <IdeaInput disabled={!settings || notConfigured} onSubmit={court.startCourt} />
           ) : (
             <div className="session">
               <div className="session-head">
